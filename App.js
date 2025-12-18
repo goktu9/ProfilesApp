@@ -1,23 +1,27 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+// +++ Import the screens.
+import ProfilesListScreen from './screens/ProfilesListScreen';
+import ProfileDetailScreen from './screens/ProfileDetailScreen';
+
+// +++ Create the Stack Navigator object.
+const Stack = createNativeStackNavigator();
 
 export default function App() {
-  // +++ Log the API URL to verify environment variable configuration.
-  console.log(process.env.EXPO_PUBLIC_API_BASE_URL); 
-
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    // +++ Wrap the app in NavigationContainer to manage navigation tree.
+    <NavigationContainer>
+      {/* +++ Define the Stack Navigator. */}
+      <Stack.Navigator>
+        {/* +++ Define the Profiles List screen as the initial route. */}
+        <Stack.Screen name="Profiles" component={ProfilesListScreen} />
+        
+        {/* +++ Define the Profile Detail screen. */}
+        <Stack.Screen 
+          name="ProfileDetail" 
+          component={ProfileDetailScreen} 
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
