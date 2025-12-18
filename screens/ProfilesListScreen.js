@@ -1,59 +1,68 @@
 import { useEffect, useState } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
-// +++ Import the api client.
+import { View, Text, FlatList, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'; 
 import { api } from '../api/client';
 
 export default function ProfilesListScreen({ navigation }) {
-  // +++ State for storing profiles list.
   const [profiles, setProfiles] = useState([]);
-  // +++ State for tracking current page number.
   const [page, setPage] = useState(1);
-  // +++ State for loading status.
   const [loading, setLoading] = useState(false);
-  // +++ State for error handling.
   const [error, setError] = useState(null);
-  // +++ State to check if more data is available.
   const [hasMore, setHasMore] = useState(true);
+  // +++ State for pull-to-refresh.
+  const [refreshing, setRefreshing] = useState(false);
 
-  // +++ Function to fetch profiles from API.
   const fetchProfiles = async () => {
-    // +++ If already loading or no more data, stop.
     if (loading || !hasMore) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      // +++ Make GET request with pagination params.
       const res = await api.get(`/profiles?page=${page}&limit=10`);
 
       if (res.data.length === 0) {
-        // +++ No more data to load.
         setHasMore(false);
       } else {
-        // +++ Append new profiles to existing list.
         setProfiles(prev => [...prev, ...res.data]);
-        // +++ Increment page number for next fetch.
         setPage(prev => prev + 1);
       }
     } catch (err) {
-      setError('Failed to load profiles. Check your connection.');
+      // +++ Use the custom error message from our interceptor.
+      setError(err.message || 'Failed to load profiles.');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // +++ Fetch profiles on initial component mount.
+  // +++ Initial Load.
   useEffect(() => {
     fetchProfiles();
   }, []);
 
-  // +++ Render individual profile item.
+  // +++ Refresh Function.
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // +++ Reset all states.
+    setProfiles([]);
+    setPage(1);
+    setHasMore(true);
+    // +++ Fetch fresh data.
+    // ! Note: We call api directly here to handle the logic simply without conflicting with 'loading' state check of fetchProfiles
+    try {
+        const res = await api.get(`/profiles?page=1&limit=10`);
+        setProfiles(res.data);
+        setPage(2);
+    } catch (err) {
+        setError(err.message);
+    } finally {
+        setRefreshing(false);
+    }
+  };
+
   const renderItem = ({ item }) => (
     <Pressable
       style={styles.card}
-      // +++ Navigate to details screen with profile ID.
       onPress={() => navigation.navigate('ProfileDetail', { id: item.id })}
     >
       <Text style={styles.name}>{item.name}</Text>
@@ -61,7 +70,6 @@ export default function ProfilesListScreen({ navigation }) {
     </Pressable>
   );
 
-  // +++ Render loading indicator at the bottom.
   const renderFooter = () => {
     if (!loading) return null;
     return (
@@ -71,7 +79,26 @@ export default function ProfilesListScreen({ navigation }) {
     );
   };
 
-  // +++ Display error message if initial load fails.
+  // +++ Component to render when list is empty.
+  const renderEmpty = () => {
+    if (loading) return null;
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No profiles found</Text>
+      </View>
+    );
+  };
+
+  // +++ Show full screen loader "only"" on initial load (empty list).
+  if (loading && profiles.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading profiles...</Text>
+      </View>
+    );
+  }
+
   if (error && profiles.length === 0) {
     return (
       <View style={styles.centerContainer}>
@@ -89,12 +116,16 @@ export default function ProfilesListScreen({ navigation }) {
         data={profiles}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
-        // +++ Trigger fetch when scrolling to end.
         onEndReached={fetchProfiles}
-        // +++ Threshold to trigger onEndReached.
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
+        // +++ Add empty component.
+        ListEmptyComponent={renderEmpty}
         contentContainerStyle={styles.listContent}
+        // +++ Add Refresh Control.
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       />
     </View>
   );
@@ -107,13 +138,13 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
+    flexGrow: 1, // Ensures empty state is centered correctly
   },
   card: {
     backgroundColor: 'white',
     padding: 16,
     marginBottom: 12,
     borderRadius: 8,
-    // Shadows
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -140,6 +171,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  // +++ Styles for empty state.
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+  },
   errorText: {
     fontSize: 16,
     color: '#d32f2f',
@@ -156,5 +198,10 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
   },
 });
